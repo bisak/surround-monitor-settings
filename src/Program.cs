@@ -11,9 +11,9 @@ using System.Windows.Interop;
 [assembly: AssemblyTitle("Monitor Control")]
 [assembly: AssemblyProduct("Monitor Control")]
 [assembly: AssemblyDescription("Control monitor settings over DDC/CI")]
-[assembly: AssemblyVersion("1.0.0.0")]
-[assembly: AssemblyFileVersion("1.0.0.0")]
-[assembly: AssemblyInformationalVersion("1.0.0")]
+[assembly: AssemblyVersion("1.0.1.0")]
+[assembly: AssemblyFileVersion("1.0.1.0")]
+[assembly: AssemblyInformationalVersion("1.0.1")]
 
 namespace MonitorControl
 {
@@ -25,7 +25,7 @@ namespace MonitorControl
         [STAThread]
         static void Main(string[] args)
         {
-            if (HasArg(args, "/diagnose")) { Diagnose(); return; }
+            if (HasArg(args, "/diagnose")) { Diagnose(!HasArg(args, "/quiet")); return; }
             string snapshot = ArgValue(args, "/snapshot");
             Theme.HideSerials = HasArg(args, "/demo");
             int select;
@@ -70,7 +70,7 @@ namespace MonitorControl
         }
 
         // Writes a plain-text report of what the app can see, for troubleshooting.
-        static void Diagnose()
+        static void Diagnose(bool open)
         {
             var settings = new Settings();
             var sb = new StringBuilder();
@@ -87,14 +87,16 @@ namespace MonitorControl
             sb.AppendLine(string.Format("Scan: {0} monitor(s) via {1} in {2} ms", monitors.Count, source, sw.ElapsedMilliseconds));
             foreach (var m in monitors)
             {
-                sb.AppendLine(string.Format("Monitor {0}: {1}  serial {2}  ({3})", m.Number, m.Port.Model, m.Port.Serial, m.Port.Location));
+                sb.AppendLine(string.Format("Monitor {0}: {1}  serial {2}  id {3}  ({4})", m.Number, m.Port.Model, m.Port.Serial, m.Port.ProductId, m.Port.Location));
                 foreach (var f in Feature.All)
                     sb.AppendLine(string.Format("    {0,-14} {1}", f.Label,
                         m.Supports(f.Code) ? m.Value(f.Code) + " / " + m.Max(f.Code) : "not supported"));
                 sb.AppendLine("    Capabilities: " + (m.Port.Capabilities() ?? "(no reply)"));
                 m.Port.Dispose();
             }
-            File.WriteAllText(Path.Combine(settings.Dir, "MonitorControl-diagnostics.txt"), sb.ToString());
+            string path = Path.Combine(Settings.LogDir, "MonitorControl-diagnostics.txt");
+            File.WriteAllText(path, sb.ToString());
+            if (open) { try { Process.Start(path); } catch { } }
         }
     }
 }

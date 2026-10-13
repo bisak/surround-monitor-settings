@@ -68,11 +68,11 @@ namespace MonitorControl
             this.showEvent = showEvent;
             this.snapshotPath = snapshotPath;
             this.snapshotSelect = snapshotSelect;
-            Log.PathName = IOPath.Combine(settings.Dir, "MonitorControl.log");
-            Log.Write("Starting, settings in " + settings.Dir);
+            Log.PathName = IOPath.Combine(Settings.LogDir, "MonitorControl.log");
+            Log.Write("Starting " + typeof(MainWindow).Assembly.GetName().Version + ", settings in " + settings.Dir);
 
             Title = "Monitor Control";
-            Width = 1280; Height = 940; MinWidth = 1180; MinHeight = 900;
+            Width = 1280; Height = 840; MinWidth = 1180; MinHeight = 800;
             WindowStartupLocation = WindowStartupLocation.CenterScreen;
             Background = Theme.Res("Canvas");
             Icon = Icons.WindowIcon();
@@ -222,7 +222,7 @@ namespace MonitorControl
             SystemEvents.PowerModeChanged -= OnPowerChanged;
             UnregisterHotkeys();
             if (tray != null) tray.Dispose();
-            foreach (var m in monitors) if (m.Lane != null) m.Lane.Dispose();
+            foreach (var m in monitors) if (m.Lane != null) m.Lane.Stop();
             worker.Dispose();
             osd.Close();
             Log.Write("Exit");
@@ -483,7 +483,7 @@ namespace MonitorControl
                 subHeading.Text = "Changes apply to " + (all ? "every screen" : targets.Count + " screens");
             }
             copyButton.Visibility = targets.Count == 1 && monitors.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
-            resetColorButton.Visibility = targets.Any(m => m.Declared != null && m.Declared.ContainsKey(0x08)) ? Visibility.Visible : Visibility.Collapsed;
+            resetColorButton.Visibility = targets.Any(m => m.CanResetColor) ? Visibility.Visible : Visibility.Collapsed;
 
             AddBrightness(targets);
             AddSlider(adjustLeft, 0x12, "Contrast", "Ink", targets);
@@ -491,12 +491,7 @@ namespace MonitorControl
             AddSlider(adjustLeft, 0x62, "Volume", "Ink", targets);
 
             adjustRight.Children.Add(CardTitle("Color"));
-            if (targets.Any(m => m.Supports(0x16) || m.Supports(0x18) || m.Supports(0x1A)))
-            {
-                AddSlider(adjustRight, 0x16, "Red", "RedText", targets);
-                AddSlider(adjustRight, 0x18, "Green", "GreenText", targets);
-                AddSlider(adjustRight, 0x1A, "Blue", "BlueText", targets);
-            }
+            AddChoice(0xDC, "Picture mode", targets);
             AddChoice(0x14, "Color tone", targets);
             if (targets.Count == 1) AddChoice(0x60, "Input", targets);
             building = false;
@@ -551,8 +546,7 @@ namespace MonitorControl
             slider.PreviewMouseLeftButtonDown += (s, e) =>
             {
                 slider.Focus();
-                dragging = slider;
-                slider.CaptureMouse();
+                if (slider.CaptureMouse()) dragging = slider;   // only block rebuilds while we really own the pointer
                 follow(e);
                 e.Handled = true;
             };
@@ -560,6 +554,7 @@ namespace MonitorControl
             slider.PreviewMouseLeftButtonUp += (s, e) =>
             {
                 if (dragging != slider) return;
+                dragging = null;
                 slider.ReleaseMouseCapture();
                 e.Handled = true;
             };
@@ -677,13 +672,20 @@ namespace MonitorControl
 
         void ResetColor()
         {
-            var targets = Targets().Where(m => m.Declared != null && m.Declared.ContainsKey(0x08)).ToList();
+            var targets = Targets().Where(m => m.CanResetColor).ToList();
             if (targets.Count == 0) return;
             if (Dialog.Show(this, "Reset color?", "Restores the factory white balance and color tone on " +
                 (targets.Count == 1 ? targets[0].Name : targets.Count + " screens") + ".", null, "Reset color") == null) return;
             SetStatus("Restoring factory color…");
-            Lane.ForEach(targets, m => { m.Port.Write(0x08, 1); Thread.Sleep(400); m.Refresh(); },
-                () => Ui(() => { RefreshTiles(); BuildAdjust(); SetStatus("Factory color restored."); }));
+            var ignored = new List<string>();
+            Lane.ForEach(targets, m => { if (!m.ResetColor()) lock (ignored) ignored.Add(m.Name); },
+                () => Ui(() =>
+                {
+                    RefreshTiles();
+                    BuildAdjust();
+                    SetStatus(ignored.Count == 0 ? "Factory color restored."
+                        : string.Join(", ", ignored) + " didn't respond to the color reset. Use the monitor's own menu.");
+                }));
         }
 
         void OnWriteFailed(Monitor m, byte code)

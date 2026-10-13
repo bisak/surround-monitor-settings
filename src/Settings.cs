@@ -7,38 +7,25 @@ using System.Windows.Forms;
 
 namespace MonitorControl
 {
-    // Plain key=value file. Lives next to the exe when that folder is writable
-    // (portable), otherwise in %APPDATA%\MonitorControl.
+    // Plain key=value file in %APPDATA%\MonitorControl (roams with the user profile).
+    // Logs and diagnostics go to %LOCALAPPDATA%\MonitorControl. Nothing is written
+    // next to the exe, so it can live anywhere, including the Desktop.
     sealed class Settings
     {
         readonly Dictionary<string, string> values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         public readonly string Dir;
+        public static readonly string LogDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MonitorControl");
         readonly string file;
 
         public Settings()
         {
-            string exeDir = Path.GetDirectoryName(Application.ExecutablePath);
-            if (IsWritable(exeDir)) Dir = exeDir;
-            else
-            {
-                Dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "MonitorControl");
-                Directory.CreateDirectory(Dir);
-            }
+            Dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "MonitorControl");
+            try { Directory.CreateDirectory(Dir); Directory.CreateDirectory(LogDir); }
+            catch (Exception ex) { Log.Write("Settings folder: " + ex.Message); }
             file = Path.Combine(Dir, "MonitorControl.ini");
             if (!Load(file)) Load(file + ".bak");
         }
 
-        static bool IsWritable(string dir)
-        {
-            try
-            {
-                string probe = Path.Combine(dir, ".write-test");
-                File.WriteAllText(probe, "");
-                File.Delete(probe);
-                return true;
-            }
-            catch { return false; }
-        }
 
         bool Load(string path)
         {

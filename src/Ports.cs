@@ -187,7 +187,23 @@ namespace MonitorControl
         // Each monitor has its own DDC bus, so the lock is per port. The driver call itself
         // is serialized globally (Nvapi.Sync), but the protocol's mandatory pauses are not,
         // so three monitors wait in parallel instead of one after another.
-        readonly object bus = new object();
+        // A named mutex, so another copy of the app (e.g. /diagnose) can't interleave
+        // transactions on the same bus. It also serializes threads within this process.
+        Mutex bus;
+
+        sealed class BusHold : IDisposable
+        {
+            readonly Mutex m; readonly bool held;
+            public BusHold(Mutex m)
+            {
+                this.m = m;
+                try { held = m.WaitOne(3000); }
+                catch (AbandonedMutexException) { held = true; }
+            }
+            public void Dispose() { if (held) m.ReleaseMutex(); }
+        }
+
+        BusHold Lock() { return new BusHold(bus); }
         static readonly System.Diagnostics.Stopwatch clock = System.Diagnostics.Stopwatch.StartNew();
         long readyAt;   // earliest time (clock ms) the monitor accepts its next command
 
@@ -198,13 +214,27 @@ namespace MonitorControl
             if (ms > 0) Thread.Sleep((int)ms);
         }
 
-        void Hold(int ms) { readyAt = clock.ElapsedMilliseconds + ms; }
+        void Hold(int ms) { readyAt = clock.ElapsedMilliseconds + Slow(ms); }
+
+        // Adaptive timing: the MCCS minimums suit most monitors, but slow ones garble replies
+        // when rushed. Each failure stretches this port's waits (up to 2.5x); a run of
+        // successes eases them back. Same idea as ddcutil's dynamic sleep.
+        double pace = 1.0;
+        int streak;
+        int Slow(int ms) { return (int)Math.Ceiling(ms * pace); }
+        void Succeeded() { if (++streak >= 20 && pace > 1.0) { pace = Math.Max(1.0, pace - 0.1); streak = 0; } }
+        void Stumbled()
+        {
+            streak = 0;
+            if (pace < 2.5) { pace = Math.Min(2.5, pace + 0.5); Log.Write(string.Format("{0}: slowing DDC timing to {1:0.0}x", Location, pace)); }
+        }
 
         public NvPort(IntPtr gpu, uint output, int gpuIndex)
         {
             this.gpu = gpu;
             this.output = output;
             Location = string.Format("nv{0}:{1:X}", gpuIndex, output);
+            bus = new Mutex(false, "MonitorControl.Bus." + Location.Replace(":", "."));
             ReadEdid();
         }
 
@@ -222,7 +252,7 @@ namespace MonitorControl
                     if (Nvapi.GetEdid(gpu, output, buf) != 0) continue;
                     var e = new byte[128];
                     Marshal.Copy(IntPtr.Add(buf, 4), e, 0, 128);
-                    Edid.Parse(e, out Model, out Serial);
+                    Edid.Parse(e, out Model, out Serial, out ProductId);
                     return;
                 }
                 catch (Exception ex) { Log.Write("EDID " + Location + ": " + ex.Message); return; }
@@ -261,24 +291,26 @@ namespace MonitorControl
             }
         }
 
+        public override void Dispose() { if (bus != null) { bus.Dispose(); bus = null; } }
+
         public override DdcResult Read(byte code, out int current, out int maximum)
         {
             current = maximum = 0;
-            lock (bus)
+            using (Lock())
             {
                 WaitReady();
                 byte[] req = { 0x82, 0x01, code, 0 };
                 req[3] = (byte)(Address ^ Host ^ 0x82 ^ 0x01 ^ code);
-                if (Transfer(req, false) != 0) { Hold(50); return DdcResult.Failed; }
-                Thread.Sleep(40);   // DDC/CI: the monitor needs 40 ms to prepare the reply
+                if (Transfer(req, false) != 0) { Stumbled(); Hold(50); return DdcResult.Failed; }
+                Thread.Sleep(Slow(40));   // DDC/CI: the monitor needs 40 ms to prepare the reply
                 byte[] rep = new byte[11];
                 int status = Transfer(rep, true);
                 Hold(20);
-                if (status != 0) return DdcResult.Failed;
+                if (status != 0) { Stumbled(); return DdcResult.Failed; }
 
                 // Reply: 6E 88 02 rc code type maxH maxL curH curL checksum
                 int o = rep[0] == Address ? 1 : 0;
-                if (rep[o] != 0x88 || rep[o + 1] != 0x02 || rep[o + 3] != code) return DdcResult.Failed;
+                if (rep[o] != 0x88 || rep[o + 1] != 0x02 || rep[o + 3] != code) { Stumbled(); return DdcResult.Failed; }
                 if (o == 1)
                 {
                     byte sum = 0x50;
@@ -286,9 +318,11 @@ namespace MonitorControl
                     if (sum != rep[10])
                     {
                         Log.Write("Bad checksum from " + Location + ": " + BitConverter.ToString(rep));
+                        Stumbled();
                         return DdcResult.Failed;
                     }
                 }
+                Succeeded();
                 if (rep[o + 2] != 0) return DdcResult.Unsupported;
                 maximum = (rep[o + 5] << 8) | rep[o + 6];
                 current = (rep[o + 7] << 8) | rep[o + 8];
@@ -298,13 +332,14 @@ namespace MonitorControl
 
         public override bool Write(byte code, int value)
         {
-            lock (bus)
+            using (Lock())
             {
                 WaitReady();
                 byte hi = (byte)(value >> 8), lo = (byte)value;
                 byte[] d = { 0x84, 0x03, code, hi, lo, 0 };
                 d[5] = (byte)(Address ^ Host ^ 0x84 ^ 0x03 ^ code ^ hi ^ lo);
                 bool ok = Transfer(d, false) == 0;
+                if (!ok) Stumbled();
                 Hold(50);   // DDC/CI: 50 ms after a set before the next command
                 return ok;
             }
@@ -315,7 +350,7 @@ namespace MonitorControl
         {
             var sb = new System.Text.StringBuilder();
             int offset = 0;
-            lock (bus)
+            using (Lock())
             {
                 WaitReady();
                 for (int guard = 0; guard < 64; guard++)
@@ -403,6 +438,35 @@ namespace MonitorControl
             return "";
         }
 
+        // EDIDs of the monitors attached to a \\.\DISPLAYn device, read from the registry, so
+        // monitors on this path also get a model name and a stable serial-based identity.
+        static List<byte[]> MonitorEdids(string deviceName)
+        {
+            var list = new List<byte[]>();
+            try
+            {
+                var dd = new DISPLAY_DEVICE();
+                dd.cb = Marshal.SizeOf(typeof(DISPLAY_DEVICE));
+                for (uint i = 0; EnumDisplayDevices(deviceName, i, ref dd, 1); i++)   // 1 = EDD_GET_DEVICE_INTERFACE_NAME
+                {
+                    // \\?\DISPLAY#SAM7489#5&1b944e99&0&UID4353#{guid} -> DISPLAY\SAM7489\5&1b944e99&0&UID4353
+                    var parts = (dd.DeviceID ?? "").Split('#');
+                    if (parts.Length >= 3)
+                    {
+                        string key = @"SYSTEM\CurrentControlSet\Enum\DISPLAY\" + parts[1] + @"\" + parts[2] + @"\Device Parameters";
+                        using (var k = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(key))
+                        {
+                            var edid = k == null ? null : k.GetValue("EDID") as byte[];
+                            if (edid != null) list.Add(edid);
+                        }
+                    }
+                    dd.cb = Marshal.SizeOf(typeof(DISPLAY_DEVICE));
+                }
+            }
+            catch (Exception ex) { Log.Write("EDID lookup " + deviceName + ": " + ex.Message); }
+            return list;
+        }
+
         // skipNvidia: leave out monitors on NVIDIA adapters (already reached through NVAPI).
         public static List<DdcPort> Enumerate(bool skipNvidia)
         {
@@ -419,8 +483,13 @@ namespace MonitorControl
                     if (!GetNumberOfPhysicalMonitorsFromHMONITOR(hMon, out n) || n == 0) return true;
                     var arr = new PHYSICAL_MONITOR[n];
                     if (!GetPhysicalMonitorsFromHMONITOR(hMon, n, arr)) return true;
+                    var edids = MonitorEdids(device);
                     for (int i = 0; i < n; i++)
-                        ports.Add(new WinPort(arr[i].hPhysicalMonitor, device.Replace("\\\\.\\", "") + "#" + (i + 1)));
+                    {
+                        var port = new WinPort(arr[i].hPhysicalMonitor, device.Replace("\\\\.\\", "") + "#" + (i + 1));
+                        if (i < edids.Count) Edid.Parse(edids[i], out port.Model, out port.Serial, out port.ProductId);
+                        ports.Add(port);
+                    }
                     return true;
                 };
                 EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero, cb, IntPtr.Zero);

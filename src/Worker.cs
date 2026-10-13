@@ -155,9 +155,15 @@ namespace MonitorControl
         // Stops the thread after the current command; waits briefly so the port can be closed.
         public void Dispose()
         {
+            Stop();
+            if (Thread.CurrentThread != thread) thread.Join(2000);
+        }
+
+        // Stops without waiting (on exit, where the process ends anyway).
+        public void Stop()
+        {
             stopping = true;
             signal.Set();
-            if (Thread.CurrentThread != thread) thread.Join(2000);
         }
 
         // Runs perMonitor on each monitor's lane in parallel, then done() once all have finished.

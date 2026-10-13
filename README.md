@@ -24,19 +24,19 @@ NVIDIA Surround merges several monitors into one big display, so brightness apps
 |  |  |
 |---|---|
 | **Every screen, one window** | Adjust all screens together, one alone, or Ctrl-click a few |
-| **The settings that matter** | Brightness, contrast, sharpness, red/green/blue, color tone, volume, input |
+| **The settings that matter** | Brightness, contrast, sharpness, volume, color tone, picture mode, input |
 | **Presets** | Save the look of every screen and apply it with <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>1</kbd> … <kbd>9</kbd> |
 | **Hotkeys anywhere** | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>PgUp</kbd> / <kbd>PgDn</kbd> change brightness, with a small on-screen level |
 | **Tray app** | Lives in the tray, starts with Windows if you like |
 | **Safe by design** | Reads each monitor's own list of supported values and never sends anything else |
 | **Fast** | Each monitor has its own I/O lane, so all screens update at once |
-| **Portable** | One small exe, settings in a file next to it, no admin rights |
+| **Portable** | One small exe you can keep anywhere, even on the Desktop. No installer, no admin rights |
 
-<img src="docs/screenshot-2.png" width="860" alt="Adjusting one screen: brightness, white balance, color tone and input">
+<img src="docs/screenshot-2.png" width="860" alt="Adjusting one screen: brightness, contrast, color tone and input">
 
 ## Get it
 
-**Download** `MonitorControl-v1.0.0-win-x64.zip` from [Releases](https://github.com/bisak/surround-monitor-settings/releases/latest), unzip anywhere and run `MonitorControl.exe`.
+**Download** `MonitorControl-vX.Y.Z-win-x64.zip` from [Releases](https://github.com/bisak/surround-monitor-settings/releases/latest), unzip anywhere and run `MonitorControl.exe`.
 
 **Or build it yourself in 5 seconds.** Windows already includes the compiler:
 
@@ -61,7 +61,16 @@ A locally built exe never shows a SmartScreen warning, because it didn't come fr
 | Laptop built-in screens | ❌ Not supported, they don't use DDC/CI |
 | Docks, KVMs, DisplayLink adapters | ⚠️ Often block DDC/CI |
 
-Tested on three **Samsung Odyssey G5** (S32CG55) on an RTX 5070 Ti in Surround. Any monitor with DDC/CI should work for brightness and contrast. Some monitors report their supported values incorrectly; known cases get a small profile in [`src/Ddc.cs`](src/Ddc.cs). If yours misbehaves, run `MonitorControl.exe /diagnose` and [open a monitor report](https://github.com/bisak/surround-monitor-settings/issues/new?template=monitor_report.yml).
+### What to expect from your monitor
+
+Tested on three **Samsung Odyssey G5** (S32CG55) on an RTX 5070 Ti in Surround.
+
+- **Brightness and contrast work on nearly every monitor with DDC/CI.** Sharpness and volume work when the monitor has them.
+- **Color tone, picture mode and input are hit and miss.** The app only offers values the monitor says it supports, and monitors often get that list wrong. Expect odd names like *6500K* or *User 1*, missing options, or a choice that does nothing. Monitors with a known quirk get a small profile in [`src/Ddc.cs`](src/Ddc.cs); the Odyssey G5 is the first.
+- **Some settings lock in some picture modes.** If a change "doesn't stick", switch the monitor to its standard mode first.
+- **No red/green/blue gain sliders.** Equal gains look neutral, and most monitors only apply them in a custom mode, so color tone covers it.
+
+If yours misbehaves, run `MonitorControl.exe /diagnose` and [open a monitor report](https://github.com/bisak/surround-monitor-settings/issues/new?template=monitor_report.yml). That's how profiles get added.
 
 <details>
 <summary><b>How it works</b></summary>
@@ -79,7 +88,9 @@ Tested on three **Samsung Odyssey G5** (S32CG55) on an RTX 5070 Ti in Surround. 
 | | |
 |---|---|
 | `/tray` | Start hidden in the tray |
-| `/diagnose` | Write `MonitorControl-diagnostics.txt` describing every monitor. Reads only. |
+| `/diagnose` | Write a report describing every monitor and open it. Reads only. |
+
+Settings live in `%APPDATA%\MonitorControl`, the log and diagnostics in `%LOCALAPPDATA%\MonitorControl`.
 
 </details>
 
