@@ -1,0 +1,38 @@
+name: Monitor report
+description: A monitor doesn't show up, or a setting doesn't work on it
+labels: [compatibility]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks! Reports like this are how support for more monitors gets added.
+        Run `MonitorControl.exe /diagnose` first. It only reads from your monitors and changes nothing.
+  - type: input
+    id: monitor
+    attributes:
+      label: Monitor model
+      placeholder: e.g. Dell U2723QE
+    validations:
+      required: true
+  - type: input
+    id: gpu
+    attributes:
+      label: Graphics card and connection
+      placeholder: e.g. RTX 4070, DisplayPort, NVIDIA Surround on
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happens?
+      placeholder: e.g. Brightness works, but color tone changes the wrong preset.
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: Paste the contents of MonitorControl-diagnostics.txt. You can remove serial numbers.
+      render: text
+    validations:
+      required: true

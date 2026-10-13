@@ -1,0 +1,40 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build with the in-box .NET Framework compiler
+        shell: cmd
+        run: build.cmd /nopause
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $name = if ($env:GITHUB_REF_TYPE -eq 'tag') { "MonitorControl-$env:GITHUB_REF_NAME-win-x64.zip" } else { "MonitorControl-win-x64.zip" }
+          Compress-Archive -Path bin\MonitorControl.exe, README.md, LICENSE -DestinationPath $name
+          "ZIP=$name" >> $env:GITHUB_ENV
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MonitorControl-win-x64
+          path: ${{ env.ZIP }}
+
+      - name: Attach to release
+        if: github.event_name == 'release'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload $env:GITHUB_REF_NAME $env:ZIP --clobber

@@ -1,0 +1,149 @@
+<Grid xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      TextElement.Foreground="{StaticResource Text}"
+      TextElement.FontFamily="{StaticResource Sans}"
+      TextElement.FontSize="14"
+      UseLayoutRounding="True" SnapsToDevicePixels="True">
+  <Grid.Background>
+    <!-- Charcoal canvas with one faint light spot. -->
+    <RadialGradientBrush Center="0.82,0.08" GradientOrigin="0.82,0.08" RadiusX="0.7" RadiusY="0.9">
+      <GradientStop Color="#222120" Offset="0"/>
+      <GradientStop Color="#191919" Offset="1"/>
+    </RadialGradientBrush>
+  </Grid.Background>
+
+  <Grid Margin="40,30,40,18">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="*"/>
+      <RowDefinition Height="Auto"/>
+    </Grid.RowDefinitions>
+
+    <!-- Header -->
+    <Grid Margin="0,0,0,22">
+      <StackPanel>
+        <TextBlock x:Name="Title" Text="Displays" FontFamily="{StaticResource Serif}" FontSize="40" Foreground="{StaticResource Ink}" Margin="0,0,0,-2"/>
+        <TextBlock x:Name="Subtitle" Foreground="{StaticResource Muted}" FontSize="14"/>
+      </StackPanel>
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+        <Border x:Name="LinkBadge" CornerRadius="10" Padding="10,3" Background="{StaticResource YellowBg}" VerticalAlignment="Center" Margin="0,0,14,0">
+          <TextBlock x:Name="LinkText" Text="SCANNING" FontFamily="{StaticResource Mono}" FontSize="11" Foreground="{StaticResource YellowText}"/>
+        </Border>
+        <Button x:Name="IdentifyButton" Style="{StaticResource Ghost}" Content="Identify"/>
+        <Button x:Name="RescanButton" Style="{StaticResource Ghost}" Content="Rescan" Margin="8,0,0,0"/>
+      </StackPanel>
+    </Grid>
+
+    <!-- Bento -->
+    <Grid Grid.Row="1" Grid.RowSpan="2">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="1*"/>
+        <ColumnDefinition Width="16"/>
+        <ColumnDefinition Width="1.2*"/>
+        <ColumnDefinition Width="16"/>
+        <ColumnDefinition Width="320"/>
+      </Grid.ColumnDefinitions>
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="16"/>
+        <RowDefinition Height="*"/>
+      </Grid.RowDefinitions>
+
+      <!-- Screens -->
+      <Border x:Name="CardScreens" Grid.Column="0" Grid.ColumnSpan="3" Style="{StaticResource CardBox}" Padding="28,20,28,22">
+        <Grid>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+          </Grid.RowDefinitions>
+          <Grid>
+            <TextBlock Text="Screens" FontFamily="{StaticResource SerifSmall}" FontSize="20" Foreground="{StaticResource Ink}"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+              <TextBlock Text="Ctrl-click to pick several, right-click for options" Foreground="{StaticResource Faint}" FontSize="12" VerticalAlignment="Center" Margin="0,0,12,0"/>
+              <Border CornerRadius="7" Background="{StaticResource Well}" Padding="3">
+                <ToggleButton x:Name="AllToggle" Style="{StaticResource Seg}" Content="All screens" Padding="10,4"/>
+              </Border>
+            </StackPanel>
+          </Grid>
+          <Grid Grid.Row="1" MinHeight="170" Margin="0,16,0,0">
+            <StackPanel x:Name="Wall" Orientation="Horizontal" HorizontalAlignment="Center"/>
+            <TextBlock x:Name="WallEmpty" Text="Looking for your screens…" Foreground="{StaticResource Muted}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          </Grid>
+        </Grid>
+      </Border>
+
+      <!-- Light -->
+      <Border x:Name="CardLight" Grid.Row="2" Grid.Column="0" Style="{StaticResource CardBox}">
+        <Grid>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+          </Grid.RowDefinitions>
+          <Grid>
+            <StackPanel Margin="0,0,0,0">
+              <TextBlock x:Name="Heading" FontFamily="{StaticResource SerifSmall}" FontSize="24" Foreground="{StaticResource Ink}" TextTrimming="CharacterEllipsis"/>
+              <TextBlock x:Name="SubHeading" Foreground="{StaticResource Muted}" FontSize="12" Margin="0,2,0,0" FontFamily="{StaticResource Mono}"/>
+            </StackPanel>
+            <Button x:Name="ReadButton" Style="{StaticResource Quiet}" Content="Refresh" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-4,-8,0"/>
+          </Grid>
+          <StackPanel x:Name="AdjustLeft" Grid.Row="1" Margin="0,18,0,0"/>
+        </Grid>
+      </Border>
+
+      <!-- Color -->
+      <Border x:Name="CardColor" Grid.Row="2" Grid.Column="2" Style="{StaticResource CardBox}">
+        <Grid>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+          </Grid.RowDefinitions>
+          <StackPanel x:Name="AdjustRight"/>
+          <WrapPanel Grid.Row="1" Margin="0,8,0,0">
+            <Button x:Name="CopyButton" Style="{StaticResource Ghost}" Content="Copy to other screens" Margin="0,0,8,0"/>
+            <Button x:Name="ResetColorButton" Style="{StaticResource Ghost}" Content="Reset color"/>
+          </WrapPanel>
+        </Grid>
+      </Border>
+
+      <!-- Presets -->
+      <Border x:Name="CardPresets" Grid.Row="0" Grid.RowSpan="3" Grid.Column="4" Style="{StaticResource CardBox}" Padding="20,20,20,22">
+        <Grid>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+          </Grid.RowDefinitions>
+          <TextBlock Text="Presets" FontFamily="{StaticResource SerifSmall}" FontSize="20" Foreground="{StaticResource Ink}" Margin="8,0,0,10"/>
+          <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel x:Name="PresetList"/>
+          </ScrollViewer>
+          <Button x:Name="SavePresetButton" Grid.Row="2" Style="{StaticResource Primary}" Content="Save current as preset" Margin="0,12,0,0"/>
+          <StackPanel Grid.Row="3" Margin="8,22,8,0">
+            <Rectangle Height="1" Fill="{StaticResource Border}" Margin="-8,0,-8,18"/>
+            <CheckBox x:Name="StartupBox" Style="{StaticResource Switch}" Content="Start with Windows"/>
+            <CheckBox x:Name="TrayBox" Style="{StaticResource Switch}" Content="Keep running when closed" Margin="0,12,0,0"/>
+            <Grid Margin="0,12,0,0">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+              </Grid.ColumnDefinitions>
+              <TextBlock Text="Hotkey step" FontSize="13" VerticalAlignment="Center"/>
+              <Border Grid.Column="1" BorderBrush="{StaticResource Border}" BorderThickness="1" CornerRadius="6">
+                <StackPanel Orientation="Horizontal">
+                  <Button x:Name="StepDown" Style="{StaticResource Quiet}" Content="−" Padding="9,2"/>
+                  <TextBlock x:Name="StepValue" Width="40" TextAlignment="Center" VerticalAlignment="Center" FontSize="13" FontFamily="{StaticResource Mono}"/>
+                  <Button x:Name="StepUp" Style="{StaticResource Quiet}" Content="+" Padding="9,2"/>
+                </StackPanel>
+              </Border>
+            </Grid>
+            <StackPanel x:Name="HotkeyHint" Orientation="Horizontal" Margin="0,14,0,0"/>
+          </StackPanel>
+        </Grid>
+      </Border>
+    </Grid>
+
+    <TextBlock x:Name="Status" Grid.Row="3" Foreground="{StaticResource Muted}" FontSize="12" Margin="2,12,0,0" TextTrimming="CharacterEllipsis"/>
+  </Grid>
+</Grid>

@@ -1,0 +1,21 @@
+# Build output
+bin/
+obj/
+*.exe
+*.pdb
+*.zip
+
+# Runtime files written next to the exe
+MonitorControl.ini
+MonitorControl.ini.bak
+MonitorControl.ini.tmp
+MonitorControl.log
+MonitorControl.log.old
+MonitorControl-diagnostics.txt
+
+# Editors and OS
+.vs/
+.vscode/
+*.user
+Thumbs.db
+Desktop.ini
