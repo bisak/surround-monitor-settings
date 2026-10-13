@@ -324,6 +324,7 @@ namespace MonitorControl
                 subtitle.Text = string.Format("{0}{1} screen{2}, connected through {3}.", Count(found.Count), model, found.Count == 1 ? "" : "s", via);
             }
             SetStatus("");
+            if (snapshotPath != null && Theme.HideSerials) ShowSampleValues();
             if (snapshotPath != null) TakeSnapshot();
         }
 
@@ -338,6 +339,22 @@ namespace MonitorControl
             if (count == 3) return new[] { "Left", "Center", "Right" }[m.Number - 1];
             if (count == 2) return new[] { "Left", "Right" }[m.Number - 1];
             return m.DefaultName;
+        }
+
+        // Docs screenshots (/snapshot ... /demo): typical daytime values instead of whatever the
+        // screens happen to be set to. Only the display cache changes; nothing is sent to monitors.
+        void ShowSampleValues()
+        {
+            var sample = new Dictionary<byte, int> { { 0x10, 60 }, { 0x12, 80 }, { 0x87, 50 }, { 0x62, 40 } };
+            foreach (var m in monitors)
+            {
+                foreach (var kv in sample)
+                    if (m.Supports(kv.Key)) m.SetCached(kv.Key, (int)Math.Round(kv.Value * m.Max(kv.Key) / 100.0));
+                var tone = m.Choices(Feature.ByCode(0x14)).FirstOrDefault(c => c.Value == "Standard");
+                if (tone.Value != null) m.SetCached(0x14, tone.Key);
+            }
+            RefreshTiles();
+            BuildAdjust();
         }
 
         void TakeSnapshot()
