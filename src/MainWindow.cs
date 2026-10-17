@@ -125,6 +125,8 @@ namespace MonitorControl
             BuildWall();
 
             rescanTimer.Tick += (s, e) => { rescanTimer.Stop(); Rescan(); };
+            trimTimer.Tick += (s, e) => TrimMemory();
+            osd.Hidden += () => { if (!IsVisible) ScheduleTrim(); };
             SystemEvents.DisplaySettingsChanged += OnDisplayChanged;
             SystemEvents.PowerModeChanged += OnPowerChanged;
             SourceInitialized += OnSourceInitialized;
@@ -195,7 +197,7 @@ namespace MonitorControl
 
         void ToggleWindow()
         {
-            if (IsVisible && WindowState != WindowState.Minimized) Hide();
+            if (IsVisible && WindowState != WindowState.Minimized) { Hide(); ScheduleTrim(); }
             else ShowWindow();
         }
 
@@ -205,6 +207,7 @@ namespace MonitorControl
             {
                 e.Cancel = true;
                 Hide();
+                ScheduleTrim();
                 if (!settings.GetBool("traytipshown", false))
                 {
                     tray.Balloon("Monitor Control is still running", "Hotkeys keep working. Right-click the tray icon to exit.");
@@ -228,6 +231,27 @@ namespace MonitorControl
             Log.Write("Exit");
             base.OnClosed(e);
             Application.Current.Shutdown();
+        }
+
+        // While waiting in the tray the app touches under 1 MB. After hiding, return the rest
+        // (WPF and driver pages) to Windows; it pages back in on next use in a few ms.
+        [DllImport("kernel32.dll")] static extern IntPtr GetCurrentProcess();
+        [DllImport("kernel32.dll")] static extern bool SetProcessWorkingSetSize(IntPtr process, IntPtr min, IntPtr max);
+        readonly DispatcherTimer trimTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
+
+        void ScheduleTrim()
+        {
+            trimTimer.Stop();
+            trimTimer.Start();
+        }
+
+        void TrimMemory()
+        {
+            trimTimer.Stop();
+            if (IsVisible || dragging != null) return;
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            SetProcessWorkingSetSize(GetCurrentProcess(), (IntPtr)(-1), (IntPtr)(-1));
         }
 
         void ExitApp()
@@ -324,6 +348,7 @@ namespace MonitorControl
                 subtitle.Text = string.Format("{0}{1} screen{2}, connected through {3}.", Count(found.Count), model, found.Count == 1 ? "" : "s", via);
             }
             SetStatus("");
+            if (!IsVisible) ScheduleTrim();   // started in the tray
             if (snapshotPath != null && Theme.HideSerials) ShowSampleValues();
             if (snapshotPath != null) TakeSnapshot();
         }
@@ -527,7 +552,9 @@ namespace MonitorControl
             return string.Join(", ", list.Take(list.Count - 1).Select(m => m.Name)) + " and " + list[list.Count - 1].Name;
         }
 
-        static string Pct(int v, int max) { return max == 0 ? "" : ((int)Math.Round(v * 100.0 / max)).ToString() + "%"; }
+        // Values are shown in the monitor's own units (e.g. 0-50 on the Odyssey G5), so the
+        // numbers match its on-screen menu.
+        static string Units(int v) { return v.ToString(); }
 
         // A slider that follows the pointer from the first press: click anywhere on the
         // rail and drag in one motion. The wheel steps by one; arrow keys work as usual.
@@ -596,13 +623,13 @@ namespace MonitorControl
             var label = Theme.Text("Brightness", 14, "Text");
             label.VerticalAlignment = VerticalAlignment.Bottom;
             label.Margin = new Thickness(0, 0, 0, 8);
-            var value = Theme.Serif(Pct(reference.Value(0x10), max), 52);
+            var value = Theme.Serif(Units(reference.Value(0x10)), 52);
             value.Margin = new Thickness(0, -10, 0, -6);
             Grid.SetColumn(value, 1);
             top.Children.Add(label);
             top.Children.Add(value);
             row.Children.Add(top);
-            row.Children.Add(MakeSlider(reference, 0x10, Theme.Res("Ink"), targets, v => value.Text = Pct(v, max)));
+            row.Children.Add(MakeSlider(reference, 0x10, Theme.Res("Ink"), targets, v => value.Text = Units(v)));
             adjustLeft.Children.Add(row);
         }
 
@@ -615,13 +642,13 @@ namespace MonitorControl
             var top = new Grid();
             top.ColumnDefinitions.Add(new ColumnDefinition());
             top.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            var value = Theme.Text(Pct(reference.Value(code), max), 13, "Text");
+            var value = Theme.Text(Units(reference.Value(code)), 13, "Text");
             value.FontFamily = Theme.Font("Mono");
             Grid.SetColumn(value, 1);
             top.Children.Add(Theme.Text(label, 13, "Muted"));
             top.Children.Add(value);
             row.Children.Add(top);
-            row.Children.Add(MakeSlider(reference, code, Theme.Res(color), targets, v => value.Text = Pct(v, max)));
+            row.Children.Add(MakeSlider(reference, code, Theme.Res(color), targets, v => value.Text = Units(v)));
             host.Children.Add(row);
         }
 
@@ -775,7 +802,7 @@ namespace MonitorControl
                 if (first == null) first = m;
             }
             if (first == null) osd.ShowLevel("Brightness", "No screens found", -1);
-            else osd.ShowLevel("Brightness", pct + "%", pct / 100.0);
+            else osd.ShowLevel("Brightness", Units(first.Value(0x10)), pct / 100.0);
             AfterExternalChange();
         }
 
@@ -794,7 +821,7 @@ namespace MonitorControl
             }
             if (first == null) { osd.ShowLevel("Brightness", scanning ? "Still looking…" : "No screens found", -1); return; }
             double frac = first.Value(0x10) / (double)first.Max(0x10);
-            osd.ShowLevel("Brightness", (int)Math.Round(frac * 100) + "%", frac);
+            osd.ShowLevel("Brightness", Units(first.Value(0x10)), frac);
             AfterExternalChange();
         }
 

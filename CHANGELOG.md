@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.2
+
+- Values are shown in each monitor's own units, so they match its on-screen menu (the Odyssey G5 shows brightness 0-50, not a percentage).
+- Much lighter in the tray: it returns its memory to Windows when hidden and uses about 1-3 MB of RAM and no CPU while idle (was about 118 MB).
+- Draws its window with the CPU, so it never opens a graphics context on your GPU.
+
 ## 1.0.1
 
 - Works with more monitors: brightness, contrast, sharpness and volume show up even when a monitor leaves them out of its capabilities list.

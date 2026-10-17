@@ -104,7 +104,7 @@ namespace MonitorControl
             // Near-black when dim, soft white when bright.
             var fill = Mix(Color.FromRgb(0x26, 0x26, 0x26), Color.FromRgb(0xF2, 0xF1, 0xEC), 0.08 + 0.92 * b);
             panel.Background = new SolidColorBrush(fill);
-            value.Text = Monitor.Supports(0x10) ? Math.Round(b * 100) + "%" : "";
+            value.Text = Monitor.Supports(0x10) ? Monitor.Value(0x10).ToString() : "";   // the monitor's own units
             value.Foreground = new SolidColorBrush(b > 0.45 ? Color.FromRgb(0x19, 0x19, 0x19) : Color.FromRgb(0xF2, 0xF2, 0xF0));
             ring.BorderBrush = selected ? Theme.Res("Ink") : Brushes.Transparent;
             name.Text = Monitor.Name;
@@ -121,6 +121,7 @@ namespace MonitorControl
         readonly TextBlock label, big;
         readonly Border bar, fill;
         readonly DispatcherTimer timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1400) };
+        public event Action Hidden;
 
         public Osd()
         {
@@ -153,7 +154,7 @@ namespace MonitorControl
                 Effect = new DropShadowEffect { ShadowDepth = 4, BlurRadius = 24, Opacity = 0.45 },
                 Child = stack
             };
-            timer.Tick += (s, e) => { timer.Stop(); Hide(); };
+            timer.Tick += (s, e) => { timer.Stop(); Hide(); if (Hidden != null) Hidden(); };
             SourceInitialized += (s, e) =>
             {
                 var h = new WindowInteropHelper(this).Handle;

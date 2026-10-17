@@ -29,7 +29,7 @@ NVIDIA Surround merges several monitors into one big display, so brightness apps
 | **Hotkeys anywhere** | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>PgUp</kbd> / <kbd>PgDn</kbd> change brightness, with a small on-screen level |
 | **Tray app** | Lives in the tray, starts with Windows if you like |
 | **Safe by design** | Reads each monitor's own list of supported values and never sends anything else |
-| **Fast** | Each monitor has its own I/O lane, so all screens update at once |
+| **Fast and light** | All screens update at once. In the tray it uses about 1-3 MB of RAM and no CPU |
 | **Portable** | One small exe you can keep anywhere, even on the Desktop. No installer, no admin rights |
 
 <img src="docs/screenshot-2.png" width="860" alt="Adjusting one screen: brightness, contrast, color tone and input">
@@ -65,7 +65,7 @@ A locally built exe never shows a SmartScreen warning, because it didn't come fr
 
 Tested on three **Samsung Odyssey G5** (S32CG55) on an RTX 5070 Ti in Surround.
 
-- **Brightness and contrast work on nearly every monitor with DDC/CI.** Sharpness and volume work when the monitor has them.
+- **Brightness and contrast work on nearly every monitor with DDC/CI.** Sharpness and volume work when the monitor has them. Values use the monitor's own scale, so they match its menu.
 - **Color tone, picture mode and input are hit and miss.** The app only offers values the monitor says it supports, and monitors often get that list wrong. Expect odd names like *6500K* or *User 1*, missing options, or a choice that does nothing. Monitors with a known quirk get a small profile in [`src/Ddc.cs`](src/Ddc.cs); the Odyssey G5 is the first.
 - **Some settings lock in some picture modes.** If a change "doesn't stick", switch the monitor to its standard mode first.
 - **No red/green/blue gain sliders.** Equal gains look neutral, and most monitors only apply them in a custom mode, so color tone covers it.

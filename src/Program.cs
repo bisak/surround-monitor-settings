@@ -11,9 +11,9 @@ using System.Windows.Interop;
 [assembly: AssemblyTitle("Monitor Control")]
 [assembly: AssemblyProduct("Monitor Control")]
 [assembly: AssemblyDescription("Control monitor settings over DDC/CI")]
-[assembly: AssemblyVersion("1.0.1.0")]
-[assembly: AssemblyFileVersion("1.0.1.0")]
-[assembly: AssemblyInformationalVersion("1.0.1")]
+[assembly: AssemblyVersion("1.0.2.0")]
+[assembly: AssemblyFileVersion("1.0.2.0")]
+[assembly: AssemblyInformationalVersion("1.0.2")]
 
 namespace MonitorControl
 {
@@ -43,6 +43,9 @@ namespace MonitorControl
                 }
                 using (var showEvent = new EventWaitHandle(false, EventResetMode.AutoReset, snapshot == null ? ShowEventName : null))
                 {
+                    // Draw with the CPU: this small UI doesn't need the GPU, and hardware rendering
+                    // loads the graphics driver's Direct3D stack (~100 MB with NVIDIA) into a tray app.
+                    System.Windows.Media.RenderOptions.ProcessRenderMode = System.Windows.Interop.RenderMode.SoftwareOnly;
                     var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
                     app.DispatcherUnhandledException += (s, e) => { Log.Write("Unhandled UI error: " + e.Exception); e.Handled = true; };
                     AppDomain.CurrentDomain.UnhandledException += (s, e) => Log.Write("Fatal: " + e.ExceptionObject);
